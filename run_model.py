@@ -13,6 +13,7 @@ from __future__ import print_function
 import torch
 import argparse
 import os 
+import sys
 
 import numpy as np
 
@@ -26,8 +27,8 @@ from utilities import loadfasta
 parser = argparse.ArgumentParser(description='Predict Secondary Structure with the S4PRED model', epilog='Takes a FASTA file containing an arbitrary number of individual sequences and outputs a secondary structure prediction for each.')
 parser.add_argument('input', metavar='input', type=str,
                     help='FASTA file with a single sequence.')
-parser.add_argument('-d','--device', metavar='d', type=str, default='cpu',
-                    help='Device to run on, Either: cpu or gpu (default; cpu).')
+parser.add_argument('-d','--device', metavar='d', type=str, default='gpu',
+                    help='Device to run on, Either: cpu or gpu (default; gpu).')
 parser.add_argument('-t','--outfmt', metavar='m', type=str, default='ss2',
                     help='Output format, Either: ss2, fas, or horiz (default; ss2).')
 parser.add_argument('-c','--fas-conf', default=False, action='store_true',
@@ -58,10 +59,16 @@ if args_dict['threads']:
     torch.set_num_threads(args_dict['threads'])
 
 # Load and freeze model
-if args_dict['device']=='cpu': device = torch.device('cpu:0') 
-if args_dict['device']=='gpu': device = torch.device("cuda:0") 
-
-s4pred=S4PRED().to(device)
+if args_dict['device']=='gpu':
+    device = torch.device("cuda:0") 
+else:
+    device = torch.device('cpu:0')
+try:
+    s4pred=S4PRED().to(device)
+except RuntimeError as e:
+    sys.stderr.write(f"Could not run on GPU. Defaulting to CPU:\n{e}")
+    device = torch.device('cpu:0')
+    s4pred=S4PRED().to(device)
 
 s4pred.eval()
 # Setting requires_grad is redundant but pytorch has been weird in the past
